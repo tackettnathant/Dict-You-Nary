@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, Image, StyleSheet,View,TextInput,ScrollView,Platform,Dimensions,TouchableHighlight,Modal } from 'react-native';
+import { Text, Image, StyleSheet,View,TextInput,ScrollView,Platform,Dimensions,TouchableHighlight,Modal,Button } from 'react-native';
 
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import resolveAssetSource from 'react-native/Libraries/Image/resolveAssetSource';
@@ -10,16 +10,35 @@ import BottomNavigation, { Tab } from 'react-native-material-bottom-navigation'
 import ActionButton from 'react-native-action-button';
 import PubSub from 'pubsub-js';
 import {EVENTS_CHANGED} from '../constants/events'
+import { NavigationActions } from 'react-navigation';
 class Entry extends React.Component {
+    static navigationOptions = ({ navigation }) => {
+          const { params } = navigation.state;
+
+          return {
+            title: params ? params.details.word : 'Dict-You-Nary Entry',
+          }
+    };
     constructor(props) {
         super(props);
-        console.log("PROPS: ")
-        console.log(props);
+
+        let entry = {...this.props.navigation.state.params.details};
+        if (!entry.definitions) {
+            entry.definitions=[{partOfSpeech:"part of speech",definition:"definition",example:null}];
+        }
+        if (!entry.image){
+            entry.image={uri:null,height:null,width:null};
+        }
+
+/*
+{...this.props.navigation.state.params.details,
+    definitions:this.props.navigation.state.params.details.definitions||[{partOfSpeech:"part of speech",definition:"definition",example:null}],
+    image:this.props.navigation.state.params.details.image||{uri:null,height:null,width:null}
+}
+*/
+
         this.state = {
-            entry:{...this.props.details,
-                definitions:this.props.details.definitions||[{partOfSpeech:"part of speech",definition:"definition",example:null}],
-                image:this.props.details.image||{uri:null,height:null,width:null}
-            },
+            entry:entry,
             //entryId:this.props.entryId || null,
             dimensions:null,
             modalVisible:false,
@@ -41,14 +60,22 @@ class Entry extends React.Component {
     }
 
     async deleteEntry() {
+
         if (this.state.entry.key){
             await DB.delete(this.state.entry.key);
         }
-        if (this.props.onDelete && typeof this.props.onDelete=="function") {
-            this.props.onDelete(this.state.entry);
-        }
+        // if (this.props.onDelete && typeof this.props.onDelete=="function") {
+        //     this.props.onDelete(this.state.entry);
+        // }
         PubSub.publish(EVENTS_CHANGED,EVENTS_CHANGED);
-
+//         const resetAction = NavigationActions.reset({
+//   index: 0,
+//   actions: [NavigationActions.navigate({ routeName: 'Home' })],
+// });
+// this.props.navigation.dispatch(resetAction);
+        //this.props.navigation.navigate("Home");
+        //this.props.navigation.pop();
+        this.setState({deleted:true})
     }
 
     getKey(){
@@ -67,6 +94,8 @@ class Entry extends React.Component {
                 this.setState({dimensions:this.computeDimensions(image)});
                 //console.log(this.state.dimensions)
             },(err)=>console.log("ERROR: " +err));
+
+
     }
 
     setModalVisible(visible) {
@@ -85,7 +114,14 @@ class Entry extends React.Component {
         }})
     }
 
-
+    doneWithAction() {
+        /*
+        ActionButton tries to update state. Since popToTop is sync, it causes state to be updated after umounting. This prevents that.
+        */
+        if (this.state.deleted) {
+            setTimeout(this.props.navigation.popToTop,0);
+        }
+    }
     updateDefFn(index) {
         return (def)=>this.updateDefinition(index,def);
     }
@@ -161,6 +197,7 @@ class Entry extends React.Component {
 
 
     render() {
+
         let padding = 10;
 
         //let thePath='../../images/goose.jpg';
@@ -178,7 +215,8 @@ class Entry extends React.Component {
               {
                 text: 'Delete',
                 onPress: ()=>this.deleteDefinition(index),
-                type: "delete"
+                type: "delete",
+                backgroundColor:"#66101F"
             }
 
             ]
@@ -201,7 +239,6 @@ class Entry extends React.Component {
         });
 
         return (
-
             <View style={styles.mainContainer}>
             <Message ref="alertMessage" position="bottom"/>
             <Modal
@@ -211,23 +248,39 @@ class Entry extends React.Component {
               onRequestClose={() => {
                   this.setModalVisible(false);
               }}>
-              <View style={{marginTop: 22,paddingLeft:20,paddingRight:20}}>
-                <View>
-                    <Text style={{flex:1}}>Definition</Text>
-                    <TextInput value={this.getEditValue("partOfSpeech")} multiline={false} onChangeText={(text)=>this.updateDefinition("partOfSpeech",text)}/>
-                    <Text style={{flex:1}}>Definition</Text>
-                    <TextInput value={this.getEditValue("definition")} multiline={true} onChangeText={(text)=>this.updateDefinition("definition",text)}/>
-                    <Text style={{flex:1}}>Example</Text>
-                    <TextInput value={this.getEditValue("example")} multiline={true} onChangeText={(text)=>this.updateDefinition("example",text)}/>
-                  <TouchableHighlight
-                    onPress={() => {
-                      this.setModalVisible(!this.state.modalVisible);
-                    }}>
-                    <Text>Hide Modal</Text>
-                  </TouchableHighlight>
+              <View style={{marginTop: 22,paddingLeft:20,paddingRight:20,flex:1, justifyContent: 'center', alignItems: 'center'}}>
+                  <View style={styles.ModalInsideView}>
+                      <View style={{flex:1,justifyContent:"center"}}>
+                            <View style={{paddingBottom:20}}>
+                            <Text style={styles.modalText}>Part of Speech</Text>
+                            <TextInput underlineColorAndroid='transparent' style={styles.modalInput} value={this.getEditValue("partOfSpeech")} multiline={false} onChangeText={(text)=>this.updateDefinition("partOfSpeech",text)}/>
+                            </View>
+                            <View style={{paddingBottom:20}}>
+                            <Text style={styles.modalText}>Definition</Text>
+                            <TextInput underlineColorAndroid='transparent' style={styles.modalInput} value={this.getEditValue("definition")} multiline={true} onChangeText={(text)=>this.updateDefinition("definition",text)}/>
+                            </View>
+                            <View style={{paddingBottom:20}}>
+                            <Text style={styles.modalText}>Example</Text>
+                            <TextInput underlineColorAndroid='transparent' style={styles.modalInput} value={this.getEditValue("example")} multiline={true} onChangeText={(text)=>this.updateDefinition("example",text)}/>
+                            </View>
+                            <View style={{flexDirection:"row",justifyContent:"space-evenly"}}>
+                            <Button
+                                title="Done"
+                                onPress={()=>{this.setModalVisible(!this.state.modalVisible)}}
+                                style={{height:40,backgroundColor:"#56E39F"}}
+                                color="#56E39F"
+                                />
+                            </View>
+
+                    </View>
                 </View>
               </View>
             </Modal>
+
+
+
+
+
 
 
 
@@ -268,7 +321,7 @@ class Entry extends React.Component {
                 </ScrollView>
 
                 {!this.state.swipeOpen?
-                (<ActionButton buttonColor="#3d4446">
+                (<ActionButton buttonColor="#3d4446" onReset={this.doneWithAction.bind(this)}>
                   <ActionButton.Item buttonColor='#66101F' title="Delete" onPress={() => this.deleteEntry()}>
                     <Icon name="delete" style={styles.actionButtonIcon} />
                   </ActionButton.Item>
@@ -288,7 +341,8 @@ class Entry extends React.Component {
 
 const styles = StyleSheet.create({
     mainContainer :{
-        backgroundColor:"#fdf9f3"
+        backgroundColor:"#fdf9f3",
+        flex:1
 
     },
     messageHolder: {
@@ -370,6 +424,27 @@ const styles = StyleSheet.create({
   height: 22,
   color: 'white',
 },
+ModalInsideView:{
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor : "#395C6B",
+  height: "80%" ,
+  width: '90%',
+  borderRadius:10,
+  borderWidth: 1,
+  borderColor: '#fff',
+  padding:20
+
+},
+    modalText: {
+        fontSize:20,
+        color:"#fff"
+    },
+    modalInput: {
+        backgroundColor:"#fff",
+        borderRadius: 10,
+        fontSize:18
+    }
 
 
 });
