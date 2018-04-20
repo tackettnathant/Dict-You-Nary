@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, Image, StyleSheet,View,TextInput,ScrollView,Platform,Dimensions,TouchableHighlight,Modal,Button } from 'react-native';
+import { Text, Image, StyleSheet,View,TextInput,ScrollView,Platform,Dimensions,TouchableHighlight,Modal,Button,TouchableOpacity } from 'react-native';
 
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import resolveAssetSource from 'react-native/Libraries/Image/resolveAssetSource';
@@ -11,6 +11,7 @@ import ActionButton from 'react-native-action-button';
 import PubSub from 'pubsub-js';
 import {EVENTS_CHANGED} from '../constants/events'
 import { NavigationActions } from 'react-navigation';
+import ImagePicker from 'react-native-image-picker';
 class Entry extends React.Component {
     static navigationOptions = ({ navigation }) => {
           const { params } = navigation.state;
@@ -38,7 +39,11 @@ class Entry extends React.Component {
 */
 
         this.state = {
-            entry:entry,
+            entry:{...this.props.navigation.state.params.details,
+                definitions:this.props.navigation.state.params.details.definitions||[{partOfSpeech:"part of speech",definition:"definition",example:null}],
+                image:this.props.navigation.state.params.details.image||{uri:null,height:null,width:null}
+            },
+            ImageSource:null,
             //entryId:this.props.entryId || null,
             dimensions:null,
             modalVisible:false,
@@ -47,6 +52,57 @@ class Entry extends React.Component {
         this.keyCount = 0;
         this.getKey = this.getKey.bind(this);
     }
+
+    selectPhotoTapped() {
+      const options = {
+        quality: 1.0,
+        maxWidth: 500,
+        maxHeight: 500,
+        storageOptions: {
+          skipBackup: true
+        }
+      };
+
+      ImagePicker.showImagePicker(options, (response) => {
+        console.log('Response = ', response);
+
+        if (response.didCancel) {
+          console.log('User cancelled photo picker');
+        }
+        else if (response.error) {
+          console.log('ImagePicker Error: ', response.error);
+        }
+        else if (response.customButton) {
+          console.log('User tapped custom button: ', response.customButton);
+        }
+        else {
+          let image = { uri: response.uri };
+
+          Image.getSize(image.uri,
+              (width,height)=>{
+                  image.height=height;
+                  image.width=width;
+                  this.setState({entry:{...this.state.entry,image:image}});
+                  this.setState({dimensions:this.computeDimensions(image)});
+                  //console.log(this.state.dimensions)
+              },(err)=>console.log("ERROR: " +err));
+
+          // You can also display the image using data:
+          // let source = { uri: 'data:image/jpeg;base64,' + response.data };
+
+          this.setState({
+
+            ImageSource: image
+
+          });
+        }
+      });
+    }
+
+
+
+
+
 
     async saveEntry() {
         try {
@@ -85,7 +141,7 @@ class Entry extends React.Component {
         if (this.state.entryId){
             this.setState({entry:DB.retrieve(this.state.entryId)})
         }
-        let image = {uri:"file:////storage/emulated/0/DCIM/Camera/IMG_20180401_180746.jpg",height:null,width:null};
+        let image = this.state.entry.image?this.state.entry.image:{uri:"file:////storage/emulated/0/DCIM/Camera/IMG_20180401_180746.jpg",height:null,width:null};
         Image.getSize(image.uri,
             (width,height)=>{
                 image.height=height;
@@ -201,7 +257,7 @@ class Entry extends React.Component {
         let padding = 10;
 
         //let thePath='../../images/goose.jpg';
-        let thePath="file:////storage/emulated/0/DCIM/Camera/IMG_20180401_180746.jpg";
+        let thePath=this.state.entry.image?this.state.entry.image.uri:"file:////storage/emulated/0/DCIM/Camera/IMG_20180401_180746.jpg";
         let {width,height} = this.computeDimensions(thePath);
         //onLongPress={()=>this.deleteDefinition(index)}
         let definitions = this.state.entry.definitions.map((def,index)=>{
@@ -243,7 +299,7 @@ class Entry extends React.Component {
             <Message ref="alertMessage" position="bottom"/>
             <Modal
               animationType="slide"
-              transparent={false}
+              transparent={true}
               visible={this.state.modalVisible}
               onRequestClose={() => {
                   this.setModalVisible(false);
@@ -304,9 +360,13 @@ class Entry extends React.Component {
                             }
                             <Text style={styles.partOfSpeech}>noun</Text>
                         </View>
+<TouchableOpacity onPress={this.selectPhotoTapped.bind(this)}>
                         <View style={{width:this.state.dimensions.image.width,height:this.state.dimensions.image.height}}>
+
                             <Image style={{flex:1,height:undefined,width:undefined}} resizeMode="contain" source={{uri:thePath}} />
+
                         </View>
+                        </TouchableOpacity>
                     </View>
                     ):(
                         <View style={{flex:1,backgroundColor:"skyblue"}}></View>
